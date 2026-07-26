@@ -53,19 +53,16 @@
   function logoURL(teamId) {
     return 'https://cdn.nba.com/logos/nba/' + teamId + '/global/L/logo.svg';
   }
-  // avatar for an entity key using slugmap extras baked into page data
+  // avatar for an entity key. No image available -> render nothing at all.
   function avatarHTML(kind, name, opts) {
     opts = opts || {};
+    var src = null;
+    if (kind === 'player' && opts.nbaId) src = headshotURL(opts.nbaId);
+    else if (kind === 'team' && opts.teamId) src = logoURL(opts.teamId);
+    if (!src) return '';
     var cls = 'avatar' + (opts.lg ? ' lg' : '') + (kind === 'team' ? ' team' : '');
-    var inner = esc(initials(name));
-    if (kind === 'player' && opts.nbaId) {
-      inner = '<img loading="lazy" src="' + headshotURL(opts.nbaId) + '" alt="" ' +
-        'onerror="this.parentNode.textContent=\'' + esc(initials(name)).replace(/'/g, '') + '\'">';
-    } else if (kind === 'team' && opts.teamId) {
-      inner = '<img loading="lazy" src="' + logoURL(opts.teamId) + '" alt="" ' +
-        'onerror="this.parentNode.textContent=\'' + esc(initials(name)).replace(/'/g, '') + '\'">';
-    }
-    return '<span class="' + cls + '">' + inner + '</span>';
+    return '<span class="' + cls + '"><img loading="lazy" src="' + src + '" alt="" ' +
+      'onerror="this.parentNode.style.display=\'none\'"></span>';
   }
 
   // entity key -> kind
@@ -85,7 +82,7 @@
   function whoHTML(sm, key, text, affil) {
     var kind = kindOf(key);
     var name = key && sm.entDisp[key] ? sm.entDisp[key] : text;
-    var av, nm;
+    var av = '', nm;
     if (kind && sm.entSlug[key]) {
       var extra = {};
       if (kind === 'player') extra.nbaId = nbaIdOf(key);
@@ -93,7 +90,6 @@
       av = avatarHTML(kind, name, extra);
       nm = '<a class="nm" href="' + entURL(kind, sm.entSlug[key]) + '">' + esc(text) + '</a>';
     } else {
-      av = '<span class="avatar">' + esc(initials(text)) + '</span>';
       nm = '<span class="nm">' + esc(text) + '</span>';
     }
     var sub = affil ? ' <span class="sub">' + esc(affil) + '</span>' : '';
@@ -104,10 +100,13 @@
 
   var CROWN = '<svg class="crown" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-label="winner"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-1.5 11h-15L3 8z"/></svg>';
 
-  // one answer row with pct bar; maxPct scales bars within a question block
+  // one answer row with pct bar; maxPct scales bars within a question block.
+  // Long free-text answers (rule changes, offseason moves) stack: text line, then bar line.
   function ansRow(sm, a, maxPct) {
     var w = a.pct != null && maxPct ? Math.max(2, a.pct / maxPct * 100) : 0;
-    var cls = 'ans' + (a.rank === 1 && a.rt === 'r' ? ' w1' : '') + (a.rt === 'v' ? ' arv' : '');
+    var stack = !a.e && a.t.length > 45;
+    var cls = 'ans' + (a.rank === 1 && a.rt === 'r' ? ' w1' : '') + (a.rt === 'v' ? ' arv' : '') +
+      (stack ? ' stack' : '');
     return '<div class="' + cls + '">' +
       whoHTML(sm, a.e, a.t, a.affil) +
       (a.rank === 1 && a.rt === 'r' ? CROWN : '') +
@@ -201,21 +200,31 @@
         if (v != null) svg.push('<circle cx="' + X(i) + '" cy="' + Y(v) + '" r="3" fill="' + s.color + '" stroke="#fcfcfb" stroke-width="2"/>');
       });
     });
-    // direct labels at each line's actual end; right-margin group gets collision nudge
+    // direct labels at each line's actual end, with global collision avoidance
     var lastPts = series.map(function (s) {
       for (var i = s.pts.length - 1; i >= 0; i--) if (s.pts[i] != null) return { i: i, y: Y(s.pts[i]), s: s };
       return null;
     }).filter(Boolean);
-    var edge = lastPts.filter(function (lp) { return lp.i >= seasons.length - 2; })
-                      .sort(function (a, b) { return a.y - b.y; });
-    var prevY = -99;
-    edge.forEach(function (lp) { lp.ly = Math.max(lp.y, prevY + 14); prevY = lp.ly; });
-    lastPts.forEach(function (lp) {
+    var labels = lastPts.map(function (lp) {
       var nm = lp.s.name.length > 17 ? lp.s.name.slice(0, 16) + '…' : lp.s.name;
       var atEdge = lp.i >= seasons.length - 2;
-      var x = atEdge ? W - MR + 8 : Math.min(X(lp.i) + 7, W - MR - 40);
-      var y = (atEdge ? lp.ly : Math.max(MT + 10, lp.y - 9)) + 4;
-      svg.push('<text x="' + x + '" y="' + y + '" font-size="11.5" font-weight="600" fill="#52514e">' + esc(nm) + '</text>');
+      return { nm: nm, atEdge: atEdge,
+               x: atEdge ? W - MR + 8 : Math.min(X(lp.i) + 7, W - MR - 40),
+               y: atEdge ? lp.y : Math.max(MT + 10, lp.y - 9),
+               w: nm.length * 7 };
+    });
+    // push overlapping labels apart (same neighborhood in x, too close in y)
+    labels.sort(function (a, b) { return a.y - b.y; });
+    for (var li = 1; li < labels.length; li++) {
+      for (var lj = 0; lj < li; lj++) {
+        var A = labels[lj], B = labels[li];
+        var xOverlap = B.x < A.x + A.w + 6 && A.x < B.x + B.w + 6;
+        if (xOverlap && B.y - A.y < 14) B.y = A.y + 14;
+      }
+      labels[li].y = Math.min(labels[li].y, MT + ih - 2);
+    }
+    labels.forEach(function (L) {
+      svg.push('<text x="' + L.x + '" y="' + (L.y + 4) + '" font-size="11.5" font-weight="600" fill="#6e6e73">' + esc(L.nm) + '</text>');
     });
     // hover columns
     seasons.forEach(function (s, i) {
@@ -392,11 +401,25 @@
   PAGES.seasons = function () {
     return fetchJSON('entities.json').then(function (ix) {
       setTitleBits('Seasons');
-      $app.innerHTML = '<h1 class="page-title">Survey Seasons</h1>' +
-        '<p class="page-sub">Every edition of the NBA.com GM Survey, from ' + ix.seasons[0] + ' to ' + ix.seasons[ix.seasons.length - 1] + '.</p>' +
-        '<div class="season-grid">' + ix.seasons.slice().reverse().map(function (s) {
-          return '<a href="' + sURL(s) + '">' + s + '<span class="sub">GM Survey</span></a>';
+      var cards = (ix.seasonCards || []).slice().reverse();
+      var html = '<h1 class="page-title">Survey Seasons</h1>' +
+        '<p class="page-sub">Every edition of the NBA.com GM Survey, from ' + ix.seasons[0] + ' to ' + ix.seasons[ix.seasons.length - 1] + '. Each card shows that year’s marquee picks.</p>' +
+        '<div class="szn-grid">' + cards.map(function (c) {
+          var rows = c.marquee.map(function (m) {
+            var kind = kindOf(m.e);
+            var extra = {};
+            if (kind === 'player') extra.nbaId = nbaIdOf(m.e);
+            if (kind === 'team') extra.teamId = TEAM_IDS[(m.e || '').slice(2)];
+            return '<span class="szn-row">' + avatarHTML(kind || 'player', m.name, extra) +
+              '<span class="szn-who"><span class="l">' + esc(m.label) + '</span><span class="n">' + esc(m.name) + '</span></span>' +
+              '<span class="szn-pct">' + (m.pct != null ? m.pct + '%' : '') + '</span></span>';
+          }).join('');
+          return '<a class="szn-card" href="' + sURL(c.season) + '">' +
+            '<span class="szn-head"><span class="y">' + c.season + '</span>' +
+            '<span class="nq">' + c.nQ + ' questions</span></span>' + rows +
+            '<span class="szn-open">Open full survey →</span></a>';
         }).join('') + '</div>';
+      $app.innerHTML = html;
     });
   };
 
@@ -426,6 +449,14 @@
     });
   };
 
+  // marquee questions first when season-counts tie
+  var Q_PRIORITY = ['nba-finals', 'if-you-were-starting-a-franchise-today-and-could-sign-any-player-in',
+    'mvp', 'best-point-guard', 'best-shooting-guard', 'best-small-forward', 'best-power-forward',
+    'best-center', 'rookie-of-the-year', 'eastern-conference-winner', 'western-conference-winner',
+    'breakout-player', 'best-international-player-in-nba', 'final-shot', 'coach-best-offense',
+    'coach-best-defensive-schemes', 'most-improved-team', 'best-overall-offseason-moves'];
+  function qPrio(slug) { var i = Q_PRIORITY.indexOf(slug); return i < 0 ? 99 : i; }
+
   PAGES.questions = function () {
     return fetchJSON('entities.json').then(function (ix) {
       setTitleBits('Questions');
@@ -434,15 +465,21 @@
         '<p class="page-sub">All ' + ix.questions.length + ' questions the GM Survey has asked since ' + ix.seasons[0] + '. Recurring questions include season-by-season trends.</p>';
       types.forEach(function (t) {
         var qs = ix.questions.filter(function (q) { return q.type === t[0]; })
-          .sort(function (a, b) { return b.nSeasons - a.nSeasons || (a.text < b.text ? -1 : 1); });
+          .sort(function (a, b) {
+            return b.nSeasons - a.nSeasons || qPrio(a.slug) - qPrio(b.slug) || (a.text < b.text ? -1 : 1);
+          });
         if (!qs.length) return;
         html += '<div class="section-hed">' + t[1] + ' <span class="count">' + qs.length + '</span></div><div class="card list-card">';
         html += qs.map(function (q) {
-          var latest = q.latestTop && q.latestTop[0] ? esc(q.latestTop[0].t) : '';
+          var bits = [];
+          if (q.topWinner) {
+            bits.push((q.nSeasons > 1 ? 'Most wins: ' : 'Winner: ') + q.topWinner.t +
+              (q.nSeasons > 1 && q.topWinner.wins > 1 ? ' (' + q.topWinner.wins + ')' : ''));
+          }
+          if (q.nSeasons > 1 && q.latestTop && q.latestTop[0]) bits.push('Last: ' + q.latestTop[0].t);
           return '<a class="ent-row" href="' + qURL(q.slug) + '"><span style="min-width:0"><span class="nm">' + esc(q.text) + '</span><br>' +
-            '<span class="meta">' + (q.nSeasons > 1 ? q.nSeasons + ' seasons · ' + q.first + ' – ' + q.last : 'asked once · ' + q.first) +
-            (latest ? ' · last winner: ' + latest : '') + '</span></span>' +
-            '<span class="right big">' + q.nSeasons + '×</span></a>';
+            '<span class="meta">' + esc(bits.join(' · ')) + '</span></span>' +
+            '<span class="right"><span class="big">' + q.nSeasons + '×</span><br><span class="meta">seasons</span></span></a>';
         }).join('');
         html += '</div>';
       });
@@ -458,7 +495,36 @@
       var html = '<div class="crumbs"><a href="' + R + 'index.html">Home</a> › <a href="' + R + 'questions.html">Questions</a></div>' +
         '<h1 class="page-title" style="font-size:clamp(24px,3.6vw,36px);text-transform:none;font-family:var(--body);font-weight:700">' + esc(d.text) + '</h1>' +
         '<p class="page-sub">' + span + '</p><div id="chartslot"></div>';
+      // podium table: most 1st/2nd/3rd-place finishes across all seasons of this question
       if (d.seasons.length > 1) {
+        var pod = {};
+        d.seasons.forEach(function (b) {
+          b.answers.forEach(function (a) {
+            if (a.rt !== 'r' || a.rank > 3) return;
+            var k = a.e || ('txt:' + a.t);
+            if (!pod[k]) pod[k] = { e: a.e, name: a.e && sm.entDisp[a.e] ? sm.entDisp[a.e] : a.t, c: [0, 0, 0] };
+            pod[k].c[a.rank - 1]++;
+          });
+        });
+        var podList = Object.keys(pod).map(function (k) { return pod[k]; }).sort(function (a, b) {
+          return b.c[0] - a.c[0] || b.c[1] - a.c[1] || b.c[2] - a.c[2];
+        }).slice(0, 8);
+        if (podList.length) {
+          html += '<div class="section-hed">Podium count</div><div class="box" style="margin-bottom:6px">' +
+            '<table class="mtab"><thead><tr><th></th><th>Who</th>' +
+            '<th class="num hi">1st ▾</th><th class="num">2nd</th><th class="num">3rd</th></tr></thead><tbody>' +
+            podList.map(function (p, i) {
+              var kind = kindOf(p.e);
+              var extra = {};
+              if (kind === 'player') extra.nbaId = nbaIdOf(p.e);
+              if (kind === 'team') extra.teamId = TEAM_IDS[(p.e || '').slice(2)];
+              var who = kind && sm.entSlug[p.e]
+                ? '<a class="who-cell" href="' + entURL(kind, sm.entSlug[p.e]) + '">' + avatarHTML(kind, p.name, extra) + '<span>' + esc(p.name) + '</span></a>'
+                : '<span class="who-cell">' + esc(p.name) + '</span>';
+              return '<tr><td class="rk">' + (i + 1) + '</td><td>' + who + '</td>' +
+                '<td class="num hi">' + (p.c[0] || '') + '</td><td class="num">' + (p.c[1] || '–') + '</td><td class="num">' + (p.c[2] || '–') + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        }
         html += '<div class="section-hed">Winner by season</div>' + winnerTimeline(d, sm);
       }
       html += '<div class="section-hed">Season by season</div>';
@@ -526,7 +592,9 @@
       var inner = rs.map(function (r) {
         var w = r.pct != null && maxPct ? Math.max(2, r.pct / maxPct * 100) : 0;
         return '<div class="hist-row"><a class="ssn" href="' + sURL(r.season) + '">' + r.season + '</a>' +
-          '<span class="rk' + (r.rank === 1 && r.rt === 'r' ? ' r1' : '') + '">' + (r.rt === 'v' ? 'votes' : '#' + r.rank) + '</span>' +
+          '<span class="rk' + (r.rank === 1 && r.rt === 'r' ? ' r1' : '') + '"' +
+          (r.rt === 'v' ? ' title="Listed by NBA.com under &quot;others receiving votes&quot;, below the ranked answers"' : '') + '>' +
+          (r.rt === 'v' ? 'unranked' : '#' + r.rank) + '</span>' +
           '<span class="barwrap"><span class="bar" style="width:' + w + '%"></span></span>' +
           '<span class="pv">' + fmtPct(r.pct, r.ps === undefined ? null : r.ps) + '</span></div>';
       }).join('');
@@ -538,9 +606,27 @@
     }).join('');
   }
 
+  // "More …" footer: neighbours in the mentions ranking of the same kind
+  function relatedHTML(ix, kind, selfKey) {
+    var listName = { player: 'players', coach: 'coaches', team: 'teams' }[kind];
+    var list = ix.entities[listName];
+    var idx = -1;
+    list.forEach(function (e, i) { if (e.k === selfKey) idx = i; });
+    var start = Math.max(0, idx - 4);
+    var picks = list.slice(start, start + 10).filter(function (e) { return e.k !== selfKey; }).slice(0, 8);
+    if (!picks.length) return '';
+    var title = { player: 'More players', coach: 'More coaches', team: 'More teams' }[kind];
+    return '<div class="section-hed">' + title + ' <span class="count">by survey mentions</span></div>' +
+      '<div class="rel-grid">' + picks.map(function (e) {
+        var extra = kind === 'player' ? { nbaId: e.nbaId } : kind === 'team' ? { teamId: e.nbaTeamId } : {};
+        return '<a class="rel-card" href="' + entURL(kind, e.slug) + '">' + avatarHTML(kind, e.name, extra) +
+          '<span><span class="nm">' + esc(e.name) + '</span><br><span class="meta">' + e.mentions + ' mentions · ' + e.wins + ' wins</span></span></a>';
+      }).join('') + '</div>';
+  }
+
   function entityPage(kind) {
-    return Promise.all([fetchJSON('e/' + P.key + '.json'), slugmap()]).then(function (res) {
-      var d = res[0], sm = res[1];
+    return Promise.all([fetchJSON('e/' + P.key + '.json'), slugmap(), fetchJSON('entities.json')]).then(function (res) {
+      var d = res[0], sm = res[1], ix = res[2];
       setTitleBits(d.name);
       var extra = {};
       if (kind === 'player' && d.nbaId) extra.nbaId = d.nbaId;
@@ -563,7 +649,7 @@
       var html = head + tiles;
       if (d.rows && d.rows.length) {
         html += '<div class="section-hed">' + (kind === 'team' ? 'Team answers' : 'Survey history') + ' <span class="count">' + d.rows.length + ' results</span></div>';
-        html += histBlocks(sm, d.rows, 3);
+        html += histBlocks(sm, d.rows, 9999);
       }
       if (kind === 'team' && d.memberVotes && d.memberVotes.length) {
         var byWho = {};
@@ -593,6 +679,7 @@
           html += '<button class="more-btn" style="margin-top:10px" onclick="var w=this.previousElementSibling.querySelector(\'.restwrap\');w.hidden=!w.hidden;this.textContent=w.hidden?\'Show all ' + order.length + '\':\'Show top 25\'">Show all ' + order.length + '</button>';
         }
       }
+      html += relatedHTML(ix, kind, d.k);
       $app.innerHTML = html;
     });
   }

@@ -267,3 +267,87 @@ h1.page-title { font-size: clamp(22px, 3.6vw, 30px); font-weight: 700; letter-sp
   .wins-grid { grid-template-columns: 1fr; }
   .kicker { display: none; }
 }
+
+/* ---------- type scale bump (site-wide bigger fonts) ---------- */
+body { font-size: 16px; }
+.masthead h1 { font-size: 1.7rem; }
+.masthead .strap { font-size: 1rem; }
+.tabs a { font-size: .8rem; }
+h1.page-title { font-size: clamp(26px, 4vw, 34px); }
+.page-sub { font-size: 1rem; }
+.crumbs { font-size: .72rem; }
+.section-hed { font-size: 1.2rem; }
+.section-hed .count { font-size: .7rem; }
+.kicker { font-size: .68rem; }
+.box-head .t { font-size: 1.05rem; }
+.mtab th { font-size: .7rem; }
+.mtab td { font-size: .92rem; padding: .5rem .6rem; }
+.mtab td.num { font-size: .85rem; }
+.mtab td .sub { font-size: .74rem; }
+.mtab td.rk { font-size: .78rem; }
+.tile .v { font-size: 1.6rem; }
+.tile .l { font-size: .68rem; }
+.ent-row .nm { font-size: 1rem; }
+.ent-row .meta { font-size: .8rem; }
+.ent-row .big { font-size: 1.2rem; }
+.rankn { font-size: .8rem; }
+.ans { font-size: .95rem; }
+.ans .pct { font-size: .85rem; width: 62px; }
+.ans .who .sub { font-size: .78rem; }
+.ans .avatar { width: 28px; height: 28px; }
+.q-card h3 { font-size: 1.1rem; }
+.q-note { font-size: .7rem; }
+.hist-row { font-size: .9rem; }
+.hist-row .ssn { font-size: .82rem; width: 72px; }
+.hist-row .rk { font-size: .8rem; width: 86px; }
+.hist-row .pv { font-size: .82rem; width: 58px; }
+.hist-block summary { font-size: 1rem; }
+.hist-block summary .n { font-size: .7rem; }
+.timeline .yr { flex: 0 0 94px; }
+.timeline .yr .s { font-size: .68rem; }
+.timeline .yr .n { font-size: .8rem; }
+.timeline .yr .p { font-size: .76rem; }
+.win-card .q { font-size: .78rem; }
+.win-card .nm { font-size: .98rem; }
+.win-card .pc { font-size: 1.2rem; }
+.chart-legend .li { font-size: .85rem; }
+.tooltip { font-size: .85rem; }
+.tooltip .tt-hed { font-size: .85rem; }
+.search-results a { font-size: .95rem; }
+.more-btn, .see-all { font-size: .76rem; }
+.fineprint { font-size: .8rem; }
+.src-link { font-size: .68rem; }
+.site-foot .inner { font-size: .7rem; }
+.note-flag { font-size: .66rem; }
+.sec-tag { font-size: .7rem; }
+.browse a { font-size: 1.05rem; }
+.browse a .sub { font-size: .68rem; }
+.team-grid a .nm { font-size: .88rem; }
+.team-grid a .meta { font-size: .68rem; }
+.ent-head .titles .sub { font-size: .92rem; }
+
+/* long free-text answers: wrap on their own line, bar drops below */
+.ans.stack { flex-wrap: wrap; }
+.ans.stack .who { flex: 1 1 100%; }
+.ans.stack .who .nm { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* related-content footer on entity pages */
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.rel-card { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.rel-card:hover { border-color: var(--accent); }
+.rel-card .nm { font-weight: 600; font-size: .95rem; }
+.rel-card .meta { font-size: .76rem; color: var(--text-secondary); }
+
+/* seasons index cards */
+.szn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.szn-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px 12px; }
+.szn-card:hover { border-color: var(--accent); }
+.szn-head { display: flex; align-items: baseline; margin-bottom: 6px; }
+.szn-head .y { font-family: var(--mono); font-weight: 600; font-size: 1.5rem; }
+.szn-head .nq { margin-left: auto; font-family: var(--mono); font-size: .68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+.szn-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--surface-hover); }
+.szn-row .avatar { width: 38px; height: 38px; }
+.szn-who .l { display: block; font-family: var(--mono); font-size: .62rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+.szn-who .n { font-weight: 600; font-size: .95rem; }
+.szn-pct { margin-left: auto; font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.szn-open { display: block; margin-top: 8px; font-family: var(--mono); font-size: .7rem; color: var(--accent); }

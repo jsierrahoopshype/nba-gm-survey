@@ -287,13 +287,24 @@ def main():
         json.dump(obj, open(os.path.join(OUT, 'q', m['slug'] + '.json'), 'w', encoding='utf-8'),
                   ensure_ascii=False, separators=(',', ':'))
         winners = []
+        win_counts = collections.Counter()
+        win_names = {}
         for b in blocks:
             top = [a for a in b['answers'] if a['rank'] == 1]
             winners.append({'season': b['season'],
                             'top': [{'t': a['t'], 'e': a['e'], 'pct': a['pct']} for a in top]})
+            for a in top:
+                wk = a['e'] or a['t']
+                win_counts[wk] += 1
+                win_names[wk] = ent_disp.get(a['e'], a['t']) if a['e'] else a['t']
+        top_winner = None
+        if win_counts:
+            wk, n = win_counts.most_common(1)[0]
+            top_winner = {'t': win_names[wk], 'e': wk if wk in ent_disp else None, 'wins': n}
         q_index.append({'text': q, 'slug': m['slug'], 'type': m['type'], 'group': m['group'],
                         'nSeasons': len(blocks), 'first': blocks[0]['season'],
-                        'last': blocks[-1]['season'], 'latestTop': winners[-1]['top']})
+                        'last': blocks[-1]['season'], 'latestTop': winners[-1]['top'],
+                        'topWinner': top_winner})
 
     # -------- per-season files
     season_qs = collections.defaultdict(list)
@@ -396,7 +407,36 @@ def main():
                       ensure_ascii=False, separators=(',', ':'))
             ent_slug[k] = info['slug']; ent_kind[k] = 'team'; ent_disp[k] = info['name']
 
-    json.dump({'seasons': seasons_all, 'questions': q_index, 'entities': entities},
+    # season cards for the seasons index page (marquee winners per year)
+    season_cards = []
+    for s in seasons_all:
+        qs = season_qs[s]
+        marquee = []
+        def add_marquee(label, pred):
+            for qq in qs:
+                if pred(qq['text']):
+                    tops = [a for a in qq['answers'] if a['rank'] == 1]
+                    if tops:
+                        a = tops[0]
+                        nm = ent_disp.get(a['e']) if a['e'] else None
+                        marquee.append({'label': label, 'name': nm or a['t'],
+                                        'e': a['e'], 'pct': a['pct'], 'qslug': qq['slug']})
+                    return
+        add_marquee('Franchise player', lambda t: 'starting a franchise' in t.lower())
+        add_marquee('MVP pick', lambda t: t.lower().startswith('who will win') and 'mvp' in t.lower())
+        add_marquee('Finals pick', lambda t: 'win the nba finals' in t.lower())
+        if not marquee:      # very early years: just take the first winners
+            for qq in qs[:3]:
+                tops = [a for a in qq['answers'] if a['rank'] == 1]
+                if tops:
+                    a = tops[0]
+                    nm = ent_disp.get(a['e']) if a['e'] else None
+                    marquee.append({'label': qq['text'][:40], 'name': nm or a['t'],
+                                    'e': a['e'], 'pct': a['pct'], 'qslug': qq['slug']})
+        season_cards.append({'season': s, 'nQ': len(qs), 'marquee': marquee})
+
+    json.dump({'seasons': seasons_all, 'seasonCards': season_cards,
+               'questions': q_index, 'entities': entities},
               open(os.path.join(OUT, 'entities.json'), 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))
 
