@@ -351,3 +351,51 @@ h1.page-title { font-size: clamp(26px, 4vw, 34px); }
 .szn-who .n { font-weight: 600; font-size: .95rem; }
 .szn-pct { margin-left: auto; font-family: var(--mono); font-weight: 600; color: var(--accent); }
 .szn-open { display: block; margin-top: 8px; font-family: var(--mono); font-size: .7rem; color: var(--accent); }
+
+/* ---------- round 4: bigger type (esp. frontpage) + alignment fixes ---------- */
+body { font-size: 17px; }
+/* fix: the flex rule must target the link inside the cell, not the td */
+.mtab .who-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mtab td { vertical-align: middle; font-size: 1rem; padding: .5rem .6rem; }
+.mtab td.num { font-size: .95rem; }
+.mtab th { font-size: .74rem; }
+.mtab td .sub { font-size: .8rem; }
+.mtab td.rk { font-size: .82rem; }
+.box-head .t { font-size: 1.2rem; }
+.kicker { font-size: .72rem; }
+.tile .v { font-size: 1.9rem; }
+.tile .l { font-size: .72rem; }
+.masthead h1 { font-size: 1.9rem; }
+.masthead .strap { font-size: 1.05rem; }
+.tabs a { font-size: .85rem; }
+.win-card .q { font-size: .85rem; }
+.win-card .nm { font-size: 1.05rem; }
+.win-card .pc { font-size: 1.3rem; }
+.see-all, .more-btn { font-size: .8rem; }
+.ent-row .nm { font-size: 1.05rem; }
+.ent-row .meta { font-size: .85rem; }
+.ans { font-size: 1rem; }
+.ans .pct { font-size: .9rem; width: 66px; }
+.hist-row { font-size: .95rem; }
+.hist-row .ssn { font-size: .86rem; width: 78px; }
+.hist-row .rk { font-size: .84rem; width: 56px; }
+.hist-row .pv { font-size: .86rem; width: 60px; }
+.q-card h3 { font-size: 1.15rem; }
+.q-note { font-size: .74rem; }
+.section-hed { font-size: 1.3rem; }
+.rel-card .nm { font-size: 1rem; }
+.rel-card .meta { font-size: .8rem; }
+.szn-who .n { font-size: 1rem; }
+.szn-head .y { font-size: 1.65rem; }
+.search-results a { font-size: 1rem; }
+.avatar { width: 36px; height: 36px; }
+.timeline .yr .n { font-size: .84rem; }
+.fineprint { font-size: .85rem; }
+
+/* season pills (related seasons footer) */
+.pill-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill-grid a {
+  font-family: var(--mono); font-size: .85rem; font-weight: 600; padding: .4rem .8rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.pill-grid a:hover { border-color: var(--accent); color: var(--accent); }

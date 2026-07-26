@@ -343,14 +343,13 @@
               '<span class="sub">' + esc(s.q) + '</span></a></td><td class="num hi">' + s.len + '</td></tr>';
           }).join(''), R + 'questions.html', 'Browse all questions →'));
 
-        boxes.push(box('Biggest landslides', 'HIGHEST REPORTED WINNING SHARE',
-          '<th></th><th>Who</th><th class="num hi">Share ▾</th>',
-          h.landslides.slice(0, 10).map(function (l, i) {
-            var name = l.e && sm.entDisp[l.e] ? sm.entDisp[l.e] : l.who;
-            var href = l.kind && l.slug ? entURL(l.kind, l.slug) : qURL(l.qslug);
-            return '<tr><td class="rk">' + (i + 1) + '</td><td><a href="' + href + '">' + esc(name) +
-              '<span class="sub">' + esc(l.q) + ' · ' + l.season + '</span></a></td><td class="num hi">' + l.pct + '%</td></tr>';
-          }).join(''), R + 'questions.html', 'Browse all questions →'));
+        var bridesmaids = ix.entities.players.filter(function (e) { return e.wins === 0; }).slice(0, 10);
+        boxes.push(box('Never voted No. 1', 'MOST MENTIONS WITHOUT A SINGLE WIN',
+          '<th></th><th>Player</th><th class="num">Questions</th><th class="num hi">Mentions ▾</th>',
+          bridesmaids.map(function (e, i) {
+            return '<tr><td class="rk">' + (i + 1) + '</td>' + whoCell('player', e.name, e.slug, { nbaId: e.nbaId }) +
+              '<td class="num">' + e.nQ + '</td><td class="num hi">' + e.mentions + '</td></tr>';
+          }).join(''), R + 'players.html'));
 
         boxes.push(box('Coach mention kings', 'ALL COACH QUESTIONS',
           '<th></th><th>Coach</th><th class="num">Wins</th><th class="num hi">Mentions ▾</th>',
@@ -424,8 +423,8 @@
   };
 
   PAGES.season = function () {
-    return Promise.all([fetchJSON('s/' + P.key + '.json'), slugmap()]).then(function (res) {
-      var d = res[0], sm = res[1];
+    return Promise.all([fetchJSON('s/' + P.key + '.json'), slugmap(), fetchJSON('entities.json')]).then(function (res) {
+      var d = res[0], sm = res[1], ix = res[2];
       setTitleBits(d.season + ' NBA GM Survey');
       var bySec = {};
       d.questions.forEach(function (q) { (bySec[q.section] = bySec[q.section] || []).push(q); });
@@ -442,7 +441,11 @@
             answersBlock(sm, q.answers, 5) + '</div>';
         }).join('');
       });
-      var seasons = null;
+      // related: every other survey season
+      html += '<div class="section-hed">More seasons</div><div class="pill-grid">' +
+        ix.seasons.slice().reverse().filter(function (s) { return s !== d.season; }).map(function (s) {
+          return '<a href="' + sURL(s) + '">' + s + '</a>';
+        }).join('') + '</div>';
       $app.innerHTML = '<div class="crumbs"><a href="' + R + 'index.html">Home</a> › <a href="' + R + 'seasons.html">Seasons</a> › ' + d.season + '</div>' +
         '<h1 class="page-title">' + d.season + ' GM Survey</h1>' +
         '<p class="page-sub">' + d.questions.length + ' questions. Winners marked with a crown; ≈ marks inferred one-vote shares.</p>' + html;
@@ -488,8 +491,8 @@
   };
 
   PAGES.question = function () {
-    return Promise.all([fetchJSON('q/' + P.key + '.json'), slugmap()]).then(function (res) {
-      var d = res[0], sm = res[1];
+    return Promise.all([fetchJSON('q/' + P.key + '.json'), slugmap(), fetchJSON('entities.json')]).then(function (res) {
+      var d = res[0], sm = res[1], ix = res[2];
       setTitleBits(d.text);
       var span = d.seasons.length > 1 ? d.seasons[0].season + ' – ' + d.seasons[d.seasons.length - 1].season + ' · ' + d.seasons.length + ' seasons' : 'asked in ' + d.seasons[0].season;
       var html = '<div class="crumbs"><a href="' + R + 'index.html">Home</a> › <a href="' + R + 'questions.html">Questions</a></div>' +
@@ -535,6 +538,21 @@
           '<div class="q-note">' + b.answers.length + ' answers' + src + orig + '</div>' +
           answersBlock(sm, b.answers, 5) + '</div>';
       }).join('');
+      // related: questions of the same type, closest in longevity
+      var rel = ix.questions.filter(function (q) { return q.slug !== d.slug && q.type === d.type; })
+        .sort(function (a, b) {
+          return Math.abs(a.nSeasons - d.seasons.length) - Math.abs(b.nSeasons - d.seasons.length) ||
+            qPrio(a.slug) - qPrio(b.slug);
+        }).slice(0, 8);
+      if (rel.length) {
+        html += '<div class="section-hed">More questions</div><div class="rel-grid">' +
+          rel.map(function (q) {
+            var meta = q.nSeasons + (q.nSeasons > 1 ? ' seasons' : ' season') +
+              (q.topWinner ? ' · Most wins: ' + q.topWinner.t : '');
+            return '<a class="rel-card" href="' + qURL(q.slug) + '"><span><span class="nm">' + esc(q.text) +
+              '</span><br><span class="meta">' + esc(meta) + '</span></span></a>';
+          }).join('') + '</div>';
+      }
       $app.innerHTML = html;
       var slot = document.getElementById('chartslot');
       if (d.type !== 'other') trendChart(slot, d, sm);
@@ -592,9 +610,7 @@
       var inner = rs.map(function (r) {
         var w = r.pct != null && maxPct ? Math.max(2, r.pct / maxPct * 100) : 0;
         return '<div class="hist-row"><a class="ssn" href="' + sURL(r.season) + '">' + r.season + '</a>' +
-          '<span class="rk' + (r.rank === 1 && r.rt === 'r' ? ' r1' : '') + '"' +
-          (r.rt === 'v' ? ' title="Listed by NBA.com under &quot;others receiving votes&quot;, below the ranked answers"' : '') + '>' +
-          (r.rt === 'v' ? 'unranked' : '#' + r.rank) + '</span>' +
+          '<span class="rk' + (r.rank === 1 && r.rt === 'r' ? ' r1' : '') + '">#' + r.rank + '</span>' +
           '<span class="barwrap"><span class="bar" style="width:' + w + '%"></span></span>' +
           '<span class="pv">' + fmtPct(r.pct, r.ps === undefined ? null : r.ps) + '</span></div>';
       }).join('');
