@@ -435,7 +435,28 @@ def main():
                                     'e': a['e'], 'pct': a['pct'], 'qslug': qq['slug']})
         season_cards.append({'season': s, 'nQ': len(qs), 'marquee': marquee})
 
-    json.dump({'seasons': seasons_all, 'seasonCards': season_cards,
+    # team cards for the teams index page (top vote-getters while on each team)
+    team_cards = []
+    for e in sorted(entities['teams'], key=lambda x: x['name']):
+        k = e['k']
+        counts = collections.Counter()
+        winc = collections.Counter()
+        meta = {}
+        for m in team_member_rows.get(k, []):
+            counts[m['e']] += 1
+            if m['rank'] == 1 and m['rt'] == 'r':
+                winc[m['e']] += 1
+            meta[m['e']] = m
+        top_members = []
+        for mk, n in counts.most_common(3):
+            m = meta[mk]
+            top_members.append({'name': m['name'], 'e': mk, 'kind': m['kind'],
+                                'slug': m['slug'], 'n': n, 'wins': winc.get(mk, 0)})
+        team_cards.append({'k': k, 'name': e['name'], 'abbr': e['abbr'],
+                           'teamId': e['nbaTeamId'], 'mentions': e['mentions'],
+                           'wins': e['wins'], 'slug': e['slug'], 'topMembers': top_members})
+
+    json.dump({'seasons': seasons_all, 'seasonCards': season_cards, 'teamCards': team_cards,
                'questions': q_index, 'entities': entities},
               open(os.path.join(OUT, 'entities.json'), 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))

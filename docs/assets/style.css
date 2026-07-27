@@ -399,3 +399,21 @@ body { font-size: 17px; }
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
 }
 .pill-grid a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* team cards on teams index */
+.tm-logo { width: 44px; height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; }
+.tm-logo img { width: 100%; height: 100%; object-fit: contain; }
+.szn-head .y.tm-name { font-family: var(--sans); font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
+.szn-head { align-items: center; }
+.szn-pct .u { display: block; font-family: var(--mono); font-size: .58rem; font-weight: 400; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; text-align: right; }
+
+/* faces of the franchise (team pages) */
+.face-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.face-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px 12px;
+}
+.face-card:hover { border-color: var(--accent); }
+.face-card .avatar.lg { width: 72px; height: 72px; }
+.face-card .nm { font-weight: 600; font-size: .95rem; line-height: 1.2; }
+.face-card .meta { font-family: var(--mono); font-size: .68rem; color: var(--text-secondary); }

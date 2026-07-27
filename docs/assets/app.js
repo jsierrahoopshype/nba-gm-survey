@@ -300,12 +300,6 @@
         var h = res[0], ix = res[1], sm = res[2];
         var st = h.stats;
 
-        var tiles = '<div class="tiles">' +
-          [['Seasons', st.seasons], ['Questions', st.questions], ['Results', st.rows.toLocaleString('en-US')],
-           ['Players', st.players], ['Coaches', st.coaches]].map(function (t) {
-            return '<div class="tile"><div class="v">' + t[1] + '</div><div class="l">' + t[0] + '</div></div>';
-          }).join('') + '</div>';
-
         // ranking box: attendance-tracker style mini table
         function box(title, kicker, headCols, rowsHTML, moreHref, moreLabel) {
           return '<div class="box"><div class="box-head"><span class="t">' + title + '</span>' +
@@ -390,7 +384,7 @@
           winHTML += '</div>';
         });
 
-        $app.innerHTML = tiles +
+        $app.innerHTML =
           '<div class="box-grid" style="margin-top:10px">' + boxes.join('') + '</div>' +
           '<div class="section-hed">The ' + h.latestSeason + ' survey <span class="count">winners of all ' + h.latestWinners.length + ' questions</span></div>' + winHTML +
           '<p class="fineprint">Data: NBA.com annual GM Survey (2002-03 to ' + h.latestSeason + '). Percentages as reported by NBA.com; ≈ marks vote shares inferred from “others receiving votes”. GMs cannot vote for their own team or personnel in most categories.</p>';
@@ -584,12 +578,23 @@
   PAGES.teams = function () {
     return fetchJSON('entities.json').then(function (ix) {
       setTitleBits('Teams');
-      var list = ix.entities.teams.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+      var cards = ix.teamCards || [];
       $app.innerHTML = '<h1 class="page-title">Teams</h1>' +
-        '<p class="page-sub">Every franchise: survey questions answered with the team, plus every vote its players and coaches received while there.</p>' +
-        '<div class="team-grid">' + list.map(function (e) {
-          return '<a href="' + entURL('team', e.slug) + '"><img loading="lazy" src="' + logoURL(e.nbaTeamId) + '" alt="">' +
-            '<div class="nm">' + esc(e.name) + '</div><div class="meta" style="font-size:11.5px;color:var(--muted)">' + e.mentions + ' team answers</div></a>';
+        '<p class="page-sub">Every franchise: its survey answers, plus the players and coaches GMs voted for while they were there.</p>' +
+        '<div class="szn-grid">' + cards.map(function (c) {
+          var rows = c.topMembers.map(function (m, i) {
+            var extra = m.kind === 'player' ? { nbaId: nbaIdOf(m.e) } : {};
+            return '<span class="szn-row">' + avatarHTML(m.kind, m.name, extra) +
+              '<span class="szn-who"><span class="l">' + (i === 0 ? 'Top vote-getter here' : m.kind === 'coach' ? 'Coach' : 'Player') + '</span>' +
+              '<span class="n">' + esc(m.name) + '</span></span>' +
+              '<span class="szn-pct">' + m.n + '<span class="u">mentions</span></span></span>';
+          }).join('');
+          return '<a class="szn-card" href="' + entURL('team', c.slug) + '">' +
+            '<span class="szn-head"><span class="tm-logo"><img loading="lazy" src="' + logoURL(c.teamId) + '" alt="" ' +
+            'onerror="this.parentNode.style.display=\'none\'"></span>' +
+            '<span class="y tm-name">' + esc(c.name) + '</span>' +
+            '<span class="nq">' + c.mentions + ' answers · ' + c.wins + ' wins</span></span>' + rows +
+            '<span class="szn-open">Open team page →</span></a>';
         }).join('') + '</div>';
     });
   };
@@ -663,18 +668,32 @@
         (d.first ? '<div class="tile"><div class="v">' + (parseInt(d.last) - parseInt(d.first) + 1) + '</div><div class="l">Year span</div></div>' : '') +
         '</div>';
       var html = head + tiles;
-      if (d.rows && d.rows.length) {
-        html += '<div class="section-hed">' + (kind === 'team' ? 'Team answers' : 'Survey history') + ' <span class="count">' + d.rows.length + ' results</span></div>';
-        html += histBlocks(sm, d.rows, 9999);
-      }
+      var byWho = {}, order = [];
       if (kind === 'team' && d.memberVotes && d.memberVotes.length) {
-        var byWho = {};
-        var order = [];
         d.memberVotes.forEach(function (m) {
           if (!byWho[m.e]) { byWho[m.e] = { name: m.name, kind: m.kind, slug: m.slug, rows: [] }; order.push(m.e); }
           byWho[m.e].rows.push(m);
         });
         order.sort(function (a, b) { return byWho[b].rows.length - byWho[a].rows.length; });
+        // faces of the franchise: big headshots up top
+        var faces = order.filter(function (k) { return byWho[k].kind === 'player'; }).slice(0, 6);
+        if (faces.length) {
+          html += '<div class="section-hed">Faces of the franchise <span class="count">most GM Survey votes while here</span></div>' +
+            '<div class="face-grid">' + faces.map(function (k) {
+              var e = byWho[k];
+              var wins = e.rows.filter(function (r) { return r.rank === 1; }).length;
+              return '<a class="face-card" href="' + entURL(e.kind, e.slug) + '">' +
+                avatarHTML('player', e.name, { nbaId: nbaIdOf(k), lg: true }) +
+                '<span class="nm">' + esc(e.name) + '</span>' +
+                '<span class="meta">' + e.rows.length + ' mentions · ' + wins + ' wins</span></a>';
+            }).join('') + '</div>';
+        }
+      }
+      if (d.rows && d.rows.length) {
+        html += '<div class="section-hed">' + (kind === 'team' ? 'Team answers' : 'Survey history') + ' <span class="count">' + d.rows.length + ' results</span></div>';
+        html += histBlocks(sm, d.rows, 9999);
+      }
+      if (kind === 'team' && order.length) {
         html += '<div class="section-hed">Votes received while with the team <span class="count">' + d.memberVotes.length + ' results · ' + order.length + ' people</span></div><div class="card list-card">';
         var TOPM = 25;
         function mrow(k, i) {
