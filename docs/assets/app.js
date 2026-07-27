@@ -585,7 +585,7 @@
           var rows = c.topMembers.map(function (m, i) {
             var extra = m.kind === 'player' ? { nbaId: nbaIdOf(m.e) } : {};
             return '<span class="szn-row">' + avatarHTML(m.kind, m.name, extra) +
-              '<span class="szn-who"><span class="l">' + (i === 0 ? 'Top vote-getter here' : m.kind === 'coach' ? 'Coach' : 'Player') + '</span>' +
+              '<span class="szn-who"><span class="l">' + (i === 0 ? 'Top vote-getter' : 'No. ' + (i + 1) + ' vote-getter') + (m.kind === 'coach' ? ' · coach' : '') + '</span>' +
               '<span class="n">' + esc(m.name) + '</span></span>' +
               '<span class="szn-pct">' + m.n + '<span class="u">mentions</span></span></span>';
           }).join('');

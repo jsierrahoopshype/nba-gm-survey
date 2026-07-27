@@ -417,3 +417,47 @@ body { font-size: 17px; }
 .face-card .avatar.lg { width: 72px; height: 72px; }
 .face-card .nm { font-weight: 600; font-size: .95rem; line-height: 1.2; }
 .face-card .meta { font-family: var(--mono); font-size: .68rem; color: var(--text-secondary); }
+
+/* ---------- round 7: one more global size bump ---------- */
+body { font-size: 18px; }
+.masthead h1 { font-size: 2.1rem; }
+.masthead .strap { font-size: 1.1rem; }
+.tabs a { font-size: .9rem; }
+.mtab td { font-size: 1.05rem; }
+.mtab td.num { font-size: 1rem; }
+.mtab th { font-size: .78rem; }
+.mtab td .sub { font-size: .84rem; }
+.mtab td.rk { font-size: .86rem; }
+.box-head .t { font-size: 1.3rem; }
+.kicker { font-size: .74rem; }
+.see-all, .more-btn { font-size: .84rem; }
+.ent-row .nm { font-size: 1.1rem; }
+.ent-row .meta { font-size: .9rem; }
+.ent-row .big { font-size: 1.3rem; }
+.ans { font-size: 1.05rem; }
+.ans .pct { font-size: .95rem; width: 70px; }
+.hist-row { font-size: 1rem; }
+.hist-row .ssn { font-size: .9rem; width: 84px; }
+.hist-row .rk { font-size: .88rem; width: 60px; }
+.hist-row .pv { font-size: .9rem; width: 64px; }
+.hist-block summary { font-size: 1.05rem; }
+.q-card h3 { font-size: 1.25rem; }
+.section-hed { font-size: 1.4rem; }
+.section-hed .count { font-size: .74rem; }
+.page-sub { font-size: 1.05rem; }
+.win-card .q { font-size: .9rem; }
+.win-card .nm { font-size: 1.1rem; }
+.szn-who .n { font-size: 1.05rem; }
+.szn-who .l { font-size: .68rem; }
+.szn-pct { font-size: 1.1rem; }
+.rel-card .nm { font-size: 1.05rem; }
+.rel-card .meta { font-size: .85rem; }
+.face-card .nm { font-size: 1rem; }
+.chart-legend .li { font-size: .9rem; }
+.tooltip { font-size: .9rem; }
+.search-results a { font-size: 1.05rem; }
+.pill-grid a { font-size: .9rem; }
+.timeline .yr { flex: 0 0 100px; }
+.timeline .yr .n { font-size: .88rem; }
+.timeline .yr .p { font-size: .8rem; }
+.fineprint { font-size: .88rem; }
