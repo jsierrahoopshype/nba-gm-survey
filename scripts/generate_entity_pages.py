@@ -9,7 +9,7 @@ import json, os, html, shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, 'docs')
-BASE = 'https://jsierrahoopshype.github.io/nba-gm-survey'
+BASE = 'https://hoopsmatic.com/nba-gm-survey'
 SITE = 'NBA GM Survey Tracker'
 
 def shell(*, title, desc, canonical, kind, key, root, nav_on=''):
@@ -31,6 +31,7 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on=''):
 <title>{t}</title>
 <meta name="description" content="{d}">
 <link rel="canonical" href="{canonical}">
+<meta property="og:url" content="{canonical}">
 <meta property="og:title" content="{t}">
 <meta property="og:description" content="{d}">
 <meta property="og:type" content="website">

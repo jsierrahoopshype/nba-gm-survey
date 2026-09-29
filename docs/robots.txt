@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://jsierrahoopshype.github.io/nba-gm-survey/sitemap.xml
+Sitemap: https://hoopsmatic.com/nba-gm-survey/sitemap.xml
