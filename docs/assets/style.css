@@ -471,4 +471,7 @@ body { font-size: 18px; }
   .note-flag { white-space: normal; }
   /* answer rows: a very long name is cut at the row edge instead of widening the page */
   .ans { overflow-x: clip; }
+  /* answer names wrap onto a second line inside their column instead of running over the bar */
+  .ans .who > span:not(.avatar) { min-width: 0; }
+  .ans .who .nm, .ans .who .sub { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 }
