@@ -461,3 +461,14 @@ body { font-size: 18px; }
 .timeline .yr .n { font-size: .88rem; }
 .timeline .yr .p { font-size: .8rem; }
 .fineprint { font-size: .88rem; }
+
+/* ---------- no sideways page scroll on phones ----------
+   Scoped below the 1100px .wrap max width, so desktop rendering is untouched. */
+@media (max-width: 1099px) {
+  /* ranking boxes (home, question podium): a table wider than its box scrolls inside the box */
+  .box { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* "as asked: …" original-wording pills wrap instead of running off the screen */
+  .note-flag { white-space: normal; }
+  /* answer rows: a very long name is cut at the row edge instead of widening the page */
+  .ans { overflow-x: clip; }
+}
