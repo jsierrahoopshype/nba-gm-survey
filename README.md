@@ -1,6 +1,6 @@
 # NBA GM Survey Tracker
 
-Every answer to every question in the NBA.com annual GM Survey (2002-03 to 2025-26),
+Every answer to every question in the NBA.com annual GM Survey (2002-03 to 2026-27),
 browsable by season, question, player, team and coach. Static site, no framework,
 served from `/docs` via GitHub Pages.
 

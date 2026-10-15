@@ -206,8 +206,10 @@
       return null;
     }).filter(Boolean);
     var labels = lastPts.map(function (lp) {
-      var nm = lp.s.name.length > 17 ? lp.s.name.slice(0, 16) + '…' : lp.s.name;
       var atEdge = lp.i >= seasons.length - 2;
+      // right-margin labels have ~110px, so they get a shorter cutoff
+      var maxCh = atEdge ? 15 : 17;
+      var nm = lp.s.name.length > maxCh ? lp.s.name.slice(0, maxCh - 1) + '…' : lp.s.name;
       return { nm: nm, atEdge: atEdge,
                x: atEdge ? W - MR + 8 : Math.min(X(lp.i) + 7, W - MR - 40),
                y: atEdge ? lp.y : Math.max(MT + 10, lp.y - 9),
@@ -221,7 +223,17 @@
         var xOverlap = B.x < A.x + A.w + 6 && A.x < B.x + B.w + 6;
         if (xOverlap && B.y - A.y < 14) B.y = A.y + 14;
       }
-      labels[li].y = Math.min(labels[li].y, MT + ih - 2);
+    }
+    // labels pushed below the chart floor: clamp, then push the stack back up
+    // (clamping alone made clusters near 0% pile on top of each other)
+    var floorY = MT + ih - 2;
+    for (var lk = labels.length - 1; lk >= 0; lk--) {
+      if (labels[lk].y > floorY) labels[lk].y = floorY;
+      for (var lm = lk + 1; lm < labels.length; lm++) {
+        var U = labels[lk], D = labels[lm];
+        var xo = D.x < U.x + U.w + 6 && U.x < D.x + D.w + 6;
+        if (xo && D.y - U.y < 14) U.y = D.y - 14;
+      }
     }
     labels.forEach(function (L) {
       svg.push('<text x="' + L.x + '" y="' + (L.y + 4) + '" font-size="11.5" font-weight="600" fill="#6e6e73">' + esc(L.nm) + '</text>');
