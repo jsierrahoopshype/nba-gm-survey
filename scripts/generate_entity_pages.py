@@ -11,6 +11,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, 'docs')
 BASE = 'https://hoopsmatic.com/nba-gm-survey'
 SITE = 'NBA GM Survey Tracker'
+N_YEARS = 24   # overwritten in main() from the data, so the strap never goes stale
 
 def shell(*, title, desc, canonical, kind, key, root, nav_on=''):
     t = html.escape(title)
@@ -47,7 +48,7 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on=''):
 <div class="search-results" id="qresults"></div></div>
 <div class="masthead">
 <h1><a href="{root}index.html">{SITE}</a></h1>
-<p class="strap">24 years of the NBA.com GM Survey, <b>cross-referenced</b> by player, team, coach, question and season.</p>
+<p class="strap">{N_YEARS} years of the NBA.com GM Survey, <b>cross-referenced</b> by player, team, coach, question and season.</p>
 </div>
 <nav class="tabs">{nav}</nav>
 <main id="app"><noscript>This site needs JavaScript to render the survey data.</noscript></main>
@@ -71,6 +72,8 @@ def write(path, content):
 def main():
     data = os.path.join(DOCS, 'data')
     ix = json.load(open(os.path.join(data, 'entities.json'), encoding='utf-8'))
+    global N_YEARS
+    N_YEARS = len(ix['seasons'])
     latest = ix['seasons'][-1]
     first = ix['seasons'][0]
 
