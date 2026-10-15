@@ -13,7 +13,7 @@ card is redrawn only when the data it shows (or the design version) changes,
 so a new survey season rewrites the cards that actually moved, not all 1,200.
 The GitHub Action in .github/workflows/rebuild.yml runs this for you.
 """
-import argparse, collections, hashlib, io, json, os, sys, urllib.request
+import argparse, collections, hashlib, io, json, os, random, sys, urllib.request
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,22 +25,28 @@ OUT = os.path.join(ROOT, 'docs', 'og')
 ASSETS = os.path.join(ROOT, 'scripts', 'og_assets')
 FACES_URL = 'https://jsierrahoopshype.github.io/nba-headshots/'
 
-DESIGN_VERSION = 1     # bump to force every card to redraw after a design change
+DESIGN_VERSION = 3     # bump to force every card to redraw after a design change
 
 W, H = 1200, 630
-BG, CARD, LINE = (245, 245, 247), (255, 255, 255), (209, 209, 214)
-INK, MUTED, ACCENT = (29, 29, 31), (110, 110, 115), (59, 130, 246)
+# Trade Card palette (jsierrahoopshype.github.io/nba-trade-card)
+BG_TOP, BG_BOT = (13, 10, 34), (36, 31, 77)          # #0d0a22 -> #241f4d
+BRAND_A, BRAND_B = (139, 124, 255), (255, 92, 168)   # #8B7CFF -> #FF5CA8
+WHITE = (255, 255, 255)
+PANEL_FALLBACK = (58, 63, 92)                        # #3a3f5c
+
+def wa(alpha):
+    """white at an opacity, as an RGBA tuple"""
+    return (255, 255, 255, int(255 * alpha))
 
 # ---------------------------------------------------------------- fonts
 
 _font_cache = {}
-def font(kind, size, weight):
-    key = (kind, size, weight)
+_POPPINS = {500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold'}
+def font(size, weight=700):
+    key = (size, weight)
     if key not in _font_cache:
-        path = os.path.join(ASSETS, 'fonts', 'DMSans.ttf' if kind == 'sans' else 'JetBrainsMono.ttf')
-        f = ImageFont.truetype(path, size)
-        f.set_variation_by_axes([min(40, size), weight] if kind == 'sans' else [weight])
-        _font_cache[key] = f
+        _font_cache[key] = ImageFont.truetype(
+            os.path.join(ASSETS, 'fonts', f'Poppins-{_POPPINS[weight]}.ttf'), size)
     return _font_cache[key]
 
 def text_w(f, s):
@@ -119,42 +125,6 @@ def logo(abbr):
     p = os.path.join(ASSETS, 'logos', f'{abbr}.png')
     return Image.open(p).convert('RGBA') if os.path.exists(p) else None
 
-def circle_face(img, d):
-    """Square face photo -> anti-aliased circle of diameter d. face2 crops can carry a
-    dark band at the bottom, so take a top-anchored 1/1.2 window (same overscan the
-    comparison video generator uses)."""
-    s = min(img.size)
-    win = int(s / 1.2)
-    x0 = (img.size[0] - win) // 2
-    crop = img.crop((x0, 0, x0 + win, win)).resize((d, d), Image.LANCZOS)
-    return crop, circle_mask(d)
-
-def circle_mask(d):
-    big = Image.new('L', (d * 4, d * 4), 0)
-    ImageDraw.Draw(big).ellipse((0, 0, d * 4 - 1, d * 4 - 1), fill=255)
-    return big.resize((d, d), Image.LANCZOS)
-
-def paste_visual(canvas, vis, cx, cy, d, faces):
-    """vis = ('face', nbaId) | ('logo', abbr). Draws a ringed circle at (cx, cy)."""
-    draw = ImageDraw.Draw(canvas)
-    r = d // 2
-    ring = 6
-    draw.ellipse((cx - r - ring, cy - r - ring, cx + r + ring, cy + r + ring), fill=CARD, outline=LINE, width=2)
-    if vis[0] == 'face':
-        img = faces.get(vis[1])
-        if img is None:
-            return False
-        face, mask = circle_face(img, d)
-        canvas.paste(face, (cx - r, cy - r), mask)
-    else:
-        lg = logo(vis[1])
-        if lg is None:
-            return False
-        inner = int(d * 0.68)
-        lg.thumbnail((inner, inner), Image.LANCZOS)
-        canvas.paste(lg, (cx - lg.size[0] // 2, cy - lg.size[1] // 2), lg)
-    return True
-
 def visual_ok(vis, faces):
     if not vis:
         return False
@@ -162,104 +132,281 @@ def visual_ok(vis, faces):
         return faces.has(vis[1])
     return os.path.exists(os.path.join(ASSETS, 'logos', f'{vis[1]}.png'))
 
+# ---------------------------------------------------------------- drawing helpers
+
+SS = 3   # supersampling for anti-aliased masks
+
+def rr_mask(w, h, r):
+    big = Image.new('L', (w * SS, h * SS), 0)
+    ImageDraw.Draw(big).rounded_rectangle((0, 0, w * SS - 1, h * SS - 1), radius=r * SS, fill=255)
+    return big.resize((w, h), Image.LANCZOS)
+
+def circle_mask(d):
+    big = Image.new('L', (d * SS, d * SS), 0)
+    ImageDraw.Draw(big).ellipse((0, 0, d * SS - 1, d * SS - 1), fill=255)
+    return big.resize((d, d), Image.LANCZOS)
+
+def brand_gradient(w, h):
+    """horizontal BRAND_A -> BRAND_B strip, RGBA"""
+    row = Image.new('RGBA', (w, 1))
+    px = row.load()
+    for x in range(w):
+        t = x / max(1, w - 1)
+        px[x, 0] = tuple(int(BRAND_A[i] + (BRAND_B[i] - BRAND_A[i]) * t) for i in range(3)) + (255,)
+    return row.resize((w, h))
+
+def overlay(im, layer, xy=(0, 0), mask=None):
+    """alpha-composite an RGBA layer onto the RGBA canvas at xy (layer keeps its own alpha;
+    an optional mask scales it further)"""
+    if mask is not None:
+        layer = layer.copy()
+        layer.putalpha(Image.composite(layer.getchannel('A'), Image.new('L', layer.size, 0), mask))
+    tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    tmp.paste(layer, xy)          # straight copy: no mask, so alpha is not applied twice
+    im.alpha_composite(tmp)
+
+def fill_shape(im, box, mask, color):
+    """paint an RGBA color (or a gradient image) through a mask at box (x, y)"""
+    w, h = mask.size
+    layer = color if isinstance(color, Image.Image) else Image.new('RGBA', (w, h), color)
+    if layer.mode != 'RGBA':
+        layer = layer.convert('RGBA')
+    layer = layer.copy()
+    # mask blends the layer's own alpha down to 0 outside the shape
+    layer.putalpha(Image.composite(layer.getchannel('A'), Image.new('L', (w, h), 0), mask))
+    overlay(im, layer, (int(box[0]), int(box[1])))
+
+def stroke_rr(im, x, y, w, h, r, color, width=2):
+    layer = Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rounded_rectangle((0, 0, w * SS - 1, h * SS - 1), radius=r * SS,
+                                            outline=color, width=width * SS)
+    overlay(im, layer.resize((w, h), Image.LANCZOS), (int(x), int(y)))
+
+def glow(im, cx, cy, radius, color, alpha):
+    """soft radial glow (like the Trade Card's pink glow behind the hero)"""
+    size = radius * 2
+    g = Image.new('L', (size, size), 0)
+    px = g.load()
+    for yy in range(size):
+        for xx in range(size):
+            dd = ((xx - radius) ** 2 + (yy - radius) ** 2) ** 0.5 / radius
+            if dd < 1:
+                px[xx, yy] = int(255 * alpha * (1 - dd) ** 1.6)
+    layer = Image.new('RGBA', (size, size), color + (0,))
+    layer.putalpha(g)
+    overlay(im, layer, (cx - radius, cy - radius))
+
+def gradient_text(im, xy, text, f, anchor='la'):
+    """text filled with the brand gradient"""
+    l, t, r, b = ImageDraw.Draw(im).textbbox(xy, text, font=f, anchor=anchor)
+    w, h = int(r - l) + 2, int(b - t) + 2
+    m = Image.new('L', (w, h), 0)
+    ImageDraw.Draw(m).text((xy[0] - l, xy[1] - t), text, font=f, fill=255, anchor=anchor)
+    fill_shape(im, (l, t), m, brand_gradient(w, h))
+
+_bg_cache = {}
+def background():
+    if 'bg' not in _bg_cache:
+        im = Image.new('RGBA', (W, H))
+        px = im.load()
+        for y in range(H):
+            t = y / (H - 1)
+            c = tuple(int(BG_TOP[i] + (BG_BOT[i] - BG_TOP[i]) * t) for i in range(3)) + (255,)
+            for x in range(W):
+                px[x, y] = c
+        # faint grain, fixed seed so a card's bytes don't change between runs
+        rnd = random.Random(7)
+        grain = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(grain)
+        for _ in range(900):
+            x, y = rnd.randrange(W), rnd.randrange(H)
+            d.rectangle((x, y, x + 1, y + 1), fill=(255, 255, 255, 8) if rnd.random() > 0.5 else (0, 0, 0, 8))
+        im.alpha_composite(grain)
+        _bg_cache['bg'] = im
+    return _bg_cache['bg'].copy()
+
+def face_crop(img, w, h):
+    """cover-crop a face2 photo into w x h. face2 crops can carry a dark band at the
+    bottom, so work from a top-anchored 1/1.2 window (same overscan the comparison
+    video generator uses)."""
+    s = min(img.size)
+    win = int(s / 1.2)
+    x0 = (img.size[0] - win) // 2
+    src = img.crop((x0, 0, x0 + win, win))
+    scale = max(w / src.size[0], h / src.size[1])
+    src = src.resize((int(src.size[0] * scale + 0.5), int(src.size[1] * scale + 0.5)), Image.LANCZOS)
+    ox = (src.size[0] - w) // 2
+    return src.crop((ox, 0, ox + w, h)).convert('RGBA')
+
+def hero_panel(im, vis, x, y, w, h, faces, radius=28):
+    """Trade Card hero: rounded photo panel, darkening at the bottom, gradient bar,
+    thin white edge. Logos sit on a white panel instead."""
+    mask = rr_mask(w, h, radius)
+    if vis[0] == 'face':
+        img = faces.get(vis[1])
+        tile = face_crop(img, w, h) if img else Image.new('RGBA', (w, h), PANEL_FALLBACK + (255,))
+        shade = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(shade)
+        for yy in range(int(h * 0.62), h):
+            a = int(0.55 * 255 * (yy - h * 0.62) / (h * 0.38))
+            sd.line((0, yy, w, yy), fill=(13, 10, 34, a))
+        tile.alpha_composite(shade)
+    else:
+        # logos: white circular badge (Trade Card's drawContainBadge) on a glass panel
+        tile = Image.new('RGBA', (w, h), (255, 255, 255, 28))
+        dd = int(min(w, h) * 0.80)
+        disc = Image.new('RGBA', (dd, dd), (255, 255, 255, 255))
+        disc.putalpha(circle_mask(dd))
+        tile.alpha_composite(disc, ((w - dd) // 2, (h - dd) // 2 - 4))
+        lg = logo(vis[1])
+        if lg:
+            inner = int(dd * 0.70)
+            lg.thumbnail((inner, inner), Image.LANCZOS)
+            tile.alpha_composite(lg, ((w - lg.size[0]) // 2, (h - lg.size[1]) // 2 - 4))
+    tile.putalpha(Image.composite(tile.getchannel('A'), Image.new('L', (w, h), 0), mask))
+    overlay(im, tile, (x, y))
+    bar_h = max(6, h // 42)
+    fill_shape(im, (x, y + h - bar_h), rr_mask(w, bar_h, bar_h // 2), brand_gradient(w, bar_h))
+    stroke_rr(im, x, y, w, h, radius, wa(0.22), 2)
+
+def mini_visual(im, vis, cx, cy, d, faces):
+    """small round picture for detail lines: face (cover) or logo on a white disc"""
+    m = circle_mask(d)
+    if vis[0] == 'face':
+        img = faces.get(vis[1])
+        if not img:
+            return
+        tile = face_crop(img, d, d)
+    else:
+        tile = Image.new('RGBA', (d, d), (255, 255, 255, 255))
+        lg = logo(vis[1])
+        if lg:
+            inner = int(d * 0.72)
+            lg.thumbnail((inner, inner), Image.LANCZOS)
+            tile.alpha_composite(lg, ((d - lg.size[0]) // 2, (d - lg.size[1]) // 2))
+    tile.putalpha(Image.composite(tile.getchannel('A'), Image.new('L', (d, d), 0), m))
+    overlay(im, tile, (cx - d // 2, cy - d // 2))
+    ring = Image.new('RGBA', (d * SS, d * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(ring).ellipse((0, 0, d * SS - 1, d * SS - 1), outline=BRAND_B + (150,), width=2 * SS)
+    overlay(im, ring.resize((d, d), Image.LANCZOS), (cx - d // 2, cy - d // 2))
+
 # ---------------------------------------------------------------- card renderer
 
 def render(spec, faces):
-    """spec: title, tiles [(num, label)], lines [(text, vis|None)], visual, badge, collage"""
-    im = Image.new('RGB', (W, H), BG)
-    d = ImageDraw.Draw(im)
+    """spec: title, subtitle, tiles [(num, label)], lines [(text, vis|None)], visual, badge, collage"""
+    im = background()
+    # Text and other translucent strokes go on a transparent top layer that is
+    # blended in at the end: drawing a translucent color straight onto the RGBA
+    # canvas would overwrite its pixels instead of blending them.
+    top = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(top)
 
-    # footer bar
-    d.rectangle((0, H - 70, W, H), fill=CARD)
-    d.line((0, H - 70, W, H - 70), fill=LINE, width=2)
-    d.ellipse((64, H - 44, 82, H - 26), fill=ACCENT)
-    d.text((94, H - 35), 'NBA GM Survey Tracker', font=font('sans', 26, 700), fill=INK, anchor='lm')
-    d.text((W - 64, H - 35), 'hoopsmatic.com/nba-gm-survey', font=font('mono', 21, 500), fill=MUTED, anchor='rm')
+    # footer: thin pink rule, dot + tracker name, site address
+    fy = H - 58
+    d.line((64, fy - 22, W - 64, fy - 22), fill=BRAND_B + (90,), width=2)
+    d.ellipse((64, fy - 6, 76, fy + 6), fill=BRAND_B + (255,))
+    d.text((88, fy), 'NBA GM SURVEY TRACKER', font=font(20, 800), fill=wa(0.75), anchor='lm')
+    d.text((W - 64, fy), 'hoopsmatic.com/nba-gm-survey', font=font(19, 600), fill=wa(0.45), anchor='rm')
 
-    main_top, main_bot = 40, H - 70 - 34
+    main_top, main_bot = 40, fy - 44
     vis = spec.get('visual') if visual_ok(spec.get('visual'), faces) else None
     collage = [v for v in spec.get('collage', []) if visual_ok(v, faces)][:4]
     has_right = bool(vis) or len(collage) >= 2
-    left, right = 64, (730 if has_right else W - 64)
+    left, right = 64, (724 if has_right else W - 64)
     maxw = right - left
 
-    # right side
+    # right side: hero panel (+ gradient pill badge) or a 2x2 collage
     if vis:
-        dia = 340 if spec.get('badge') else 380
-        cy = (main_top + main_bot) // 2 - (24 if spec.get('badge') else 0)
-        paste_visual(im, vis, 960, cy, dia, faces)
-        if spec.get('badge'):
-            bf = font('mono', 26, 600)
-            bt = spec['badge']
-            bw = text_w(bf, bt) + 40
-            by = cy + dia // 2 + 26
-            d.rounded_rectangle((960 - bw / 2, by, 960 + bw / 2, by + 48), radius=24, fill=ACCENT)
-            d.text((960, by + 24), bt, font=bf, fill=(255, 255, 255), anchor='mm')
+        badge = spec.get('badge')
+        pw, ph = 340, (380 if badge else 432)
+        px_, py_ = 1136 - pw, main_top + (8 if badge else 0)
+        glow(im, px_ + pw // 2, py_ + int(ph * 0.45), 300, BRAND_B, 0.30)
+        hero_panel(im, vis, px_, py_, pw, ph, faces)
+        if badge:
+            bf = font(28, 800)
+            bw = int(text_w(bf, badge)) + 56
+            bh = 56
+            bx, by = px_ + (pw - bw) // 2, py_ + ph + 16
+            fill_shape(im, (bx, by), rr_mask(bw, bh, bh // 2), brand_gradient(bw, bh))
+            d.text((bx + bw / 2, by + bh / 2 + 1), badge, font=bf, fill=WHITE, anchor='mm')
     elif len(collage) >= 2:
-        pos = [(870, 190), (1050, 190), (870, 370), (1050, 370)]
-        for (cx, cy), v in zip(pos, collage):
-            paste_visual(im, v, cx, cy, 150, faces)
+        glow(im, 966, 260, 300, BRAND_B, 0.26)
+        cs, gap = 164, 16
+        for i, v in enumerate(collage):
+            cx = 1136 - 2 * cs - gap + (i % 2) * (cs + gap)
+            cy = main_top + 32 + (i // 2) * (cs + gap)
+            hero_panel(im, v, cx, cy, cs, cs, faces, radius=20)
 
-    # left block: measure first, then center vertically
+    # left block: measure, then center vertically
     title = spec['title']
-    for size in (76, 68, 60, 54, 48, 44, 40, 36):
-        tf = font('sans', size, 700)
+    for size in (72, 64, 58, 52, 46, 42, 38, 34):
+        tf = font(size, 800)
         lines = wrap(title, tf, maxw, 3)
         if lines:
             break
     else:
-        tf = font('sans', 36, 700)
+        tf = font(34, 800)
         lines = (wrap(title, tf, maxw, 99) or [title])[:3]
         lines[-1] = ellipsize(lines[-1] + ' …', tf, maxw)
-    lh = int(tf.size * 1.12)
+    lh = int(tf.size * 1.14)
     blocks = [('title', lines, lh)]
     if spec.get('subtitle'):
-        blocks.append(('sub', spec['subtitle'], 44))
+        blocks.append(('sub', spec['subtitle'], 40))
     tiles = spec.get('tiles', [])[:3]
     if tiles:
-        blocks.append(('tiles', tiles, 112))
+        blocks.append(('tiles', tiles, 104))
     for t, v in spec.get('lines', [])[:3]:
-        blocks.append(('line', (t, v if visual_ok(v, faces) else None), 58))
-    gaps = {'title': 26, 'sub': 24, 'tiles': 18, 'line': 4}
+        blocks.append(('line', (t, v if visual_ok(v, faces) else None), 54))
+    gaps = {'title': 18, 'sub': 24, 'tiles': 16, 'line': 4}
     def height(bl):
         return sum(len(b[1]) * b[2] if b[0] == 'title' else b[2] for b in bl) + \
             sum(gaps[b[0]] for b in bl[:-1])
     while height(blocks) > main_bot - main_top and blocks[-1][0] == 'line':
         blocks.pop()                     # never let detail lines run into the footer
-    total = height(blocks)
-    y = main_top + max(0, (main_bot - main_top - total) // 2)
+    y = main_top + max(0, (main_bot - main_top - height(blocks)) // 2)
 
     for kind, payload, bh in blocks:
         if kind == 'title':
             for ln in payload:
-                d.text((left, y), ln, font=tf, fill=INK)
+                d.text((left, y), ln, font=tf, fill=WHITE)
                 y += bh
         elif kind == 'sub':
-            sf = font('sans', 30, 500)
-            d.text((left, y), ellipsize(payload, sf, maxw), font=sf, fill=MUTED)
+            sf = font(26, 600)
+            d.text((left, y), ellipsize(payload, sf, maxw), font=sf, fill=wa(0.62))
             y += bh
         elif kind == 'tiles':
             n = len(payload)
-            tw = (maxw - 16 * (n - 1)) / n
+            tw = int((maxw - 14 * (n - 1)) / n)
+            th = bh - 8
             for i, (num, lab) in enumerate(payload):
-                x0 = left + i * (tw + 16)
-                d.rounded_rectangle((x0, y, x0 + tw, y + bh - 8), radius=14, fill=CARD, outline=LINE, width=2)
-                nf = font('mono', 46 if len(str(num)) <= 5 else 34, 600)
-                d.text((x0 + 20, y + 16), str(num), font=nf, fill=ACCENT)
-                lf = font('sans', 21, 500)
-                d.text((x0 + 20, y + 70), ellipsize(lab, lf, tw - 30), font=lf, fill=MUTED)
+                x0 = int(left + i * (tw + 14))
+                fill_shape(im, (x0, y), rr_mask(tw, th, 18), wa(0.045))
+                stroke_rr(im, x0, y, tw, th, 18, BRAND_A + (128,), 2)
+                nf = font(42, 800)
+                for fs in (42, 36, 30, 26):          # shrink long values to fit the tile
+                    nf = font(fs, 800)
+                    if text_w(nf, str(num)) <= tw - 36:
+                        break
+                gradient_text(im, (x0 + 20, y + 10), str(num), nf)
+                lf = font(18, 600)
+                d.text((x0 + 20, y + 64), ellipsize(lab.upper(), lf, tw - 32), font=lf, fill=wa(0.55))
             y += bh
         else:
             txt, v = payload
-            lf = font('sans', 27, 500)
+            lf = font(24, 600)
             x = left
             if v:
-                paste_visual(im, v, left + 22, y + 26, 40, faces)
-                x = left + 60
-            d.text((x, y + 26), ellipsize(txt, lf, right - x), font=lf, fill=INK, anchor='lm')
+                mini_visual(im, v, left + 21, y + 25, 42, faces)
+                x = left + 58
+            else:
+                d.ellipse((left, y + 20, left + 10, y + 30), fill=BRAND_B + (255,))
+                x = left + 24
+            d.text((x, y + 25), ellipsize(txt, lf, right - x), font=lf, fill=wa(0.88), anchor='lm')
             y += bh
         y += gaps[kind]
-    return im
+    im.alpha_composite(top)
+    return im.convert('RGB')
+
 
 # ---------------------------------------------------------------- specs from site data
 
@@ -415,10 +562,10 @@ def build_specs(faces):
             else:
                 best = min(rows, key=lambda r: (r['rank'], -(r['pct'] or 0)))
                 lines.append((f'Best finish: No. {best["rank"]}, {short_label(best["q"])} ({best["season"]})', None))
+                n_seasons = len(set(r['season'] for r in rows))
                 tiles = [(e['mentions'], 'time named' if e['mentions'] == 1 else 'times named'),
                          (e['nQ'], 'question' if e['nQ'] == 1 else 'questions'),
-                         (f'{e["first"][2:]}–{e["last"][2:]}' if e['first'] != e['last'] else e['first'],
-                          'seasons named' if e['first'] != e['last'] else 'season named')]
+                         (n_seasons, 'season named' if n_seasons == 1 else 'seasons named')]
             span = f'{e["first"]} to {e["last"]}' if e['first'] != e['last'] else e['first']
             specs[f'{folder}/{e["slug"]}'] = {'title': e['name'], 'subtitle': f'in the NBA GM Survey, {span}',
                                               'tiles': tiles, 'lines': lines, 'visual': vis_for(k)}

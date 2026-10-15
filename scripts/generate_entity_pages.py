@@ -5,7 +5,7 @@ Run AFTER scripts/build_site_data.py:  python scripts/generate_entity_pages.py
 Regenerates docs/index.html, list pages, and every season/question/player/
 team/coach page from docs/data/*.json. Stdlib only.
 """
-import json, os, html, shutil, collections, sys
+import json, os, html, shutil, collections, sys, re, hashlib, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from qlabels import short_label
 
@@ -86,6 +86,37 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on='', og_key=None):
 </html>
 '''
 
+LASTMOD_FILE = os.path.join(ROOT, 'data', 'sitemap_lastmod.json')
+
+def sitemap_lastmod(urls, data_for, data):
+    """Per-URL <lastmod> that moves only when that page's content changes.
+
+    A page's fingerprint = its HTML (minus the masthead strap, whose year count
+    changes for every page each season) + the data JSON it renders. Fingerprints
+    and dates live in data/sitemap_lastmod.json (committed); a URL keeps its old
+    date while its fingerprint is unchanged, and gets today's date (UTC) when it
+    changes or is new. URLs no longer in the site drop out."""
+    try:
+        old = json.load(open(LASTMOD_FILE, encoding='utf-8'))
+    except (OSError, ValueError):
+        old = {}
+    today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
+    new = {}
+    for u in urls:
+        rel = u[len(BASE) + 1:] or 'index.html'
+        h = hashlib.sha1()
+        page = open(os.path.join(DOCS, rel), encoding='utf-8').read()
+        h.update(re.sub(r'<p class="strap">.*?</p>', '', page).encode('utf-8'))
+        df = data_for.get(u)
+        if df and os.path.exists(os.path.join(data, df)):
+            h.update(open(os.path.join(data, df), 'rb').read())
+        fp = h.hexdigest()[:16]
+        prev = old.get(u)
+        new[u] = prev if prev and prev[0] == fp else [fp, today]
+    with open(LASTMOD_FILE, 'w', encoding='utf-8') as f:
+        json.dump(new, f, indent=0, sort_keys=True)
+    return {u: v[1] for u, v in new.items()}
+
 def write(path, content):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -153,6 +184,9 @@ def main():
             kind=kind, key=None, root='', nav_on=kind, og_key=kind)); n += 1
 
     urls = [f'{BASE}/', *(f'{BASE}/{k}.html' for k, _, _ in lists)]
+    # url -> data file the page renders (for the sitemap's per-page <lastmod>)
+    data_for = {f'{BASE}/': 'highlights.json'}
+    data_for.update({f'{BASE}/{k}.html': 'entities.json' for k, _, _ in lists})
 
     # ---- seasons
     cards = {c['season']: c for c in ix['seasonCards']}
@@ -166,6 +200,7 @@ def main():
             canonical=f'{BASE}/seasons/{s}.html', kind='season', key=s, root='../',
             nav_on='seasons', og_key=f'seasons/{s}'))
         urls.append(f'{BASE}/seasons/{s}.html'); n += 1
+        data_for[urls[-1]] = f's/{s}.json'
 
     # ---- questions
     for q in ix['questions']:
@@ -192,6 +227,7 @@ def main():
             canonical=f'{BASE}/questions/{q["slug"]}.html', kind='question', key=q['slug'],
             root='../', nav_on='questions', og_key=f'questions/{q["slug"]}'))
         urls.append(f'{BASE}/questions/{q["slug"]}.html'); n += 1
+        data_for[urls[-1]] = f'q/{q["slug"]}.json'
 
     # ---- entities (page key = entity key; slug in filename)
     kinds = [('players', 'player', ents['players']),
@@ -237,13 +273,15 @@ def main():
                 title=title + SUF, desc=desc, canonical=f'{BASE}/{folder}/{e["slug"]}.html',
                 kind=kind, key=e['k'], root='../', nav_on=folder, og_key=f'{folder}/{e["slug"]}'))
             urls.append(f'{BASE}/{folder}/{e["slug"]}.html'); n += 1
+            data_for[urls[-1]] = f'e/{e["k"]}.json'
 
     # ---- sitemap + 404
     with open(os.path.join(DOCS, 'sitemap.xml'), 'w', encoding='utf-8') as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
+        lastmod = sitemap_lastmod(urls, data_for, data)
         for u in urls:
-            f.write(f'  <url><loc>{u}</loc></url>\n')
+            f.write(f'  <url><loc>{u}</loc><lastmod>{lastmod[u]}</lastmod></url>\n')
         f.write('</urlset>\n')
     write(os.path.join(DOCS, 'robots.txt'), f'User-agent: *\nAllow: /\nSitemap: {BASE}/sitemap.xml\n')
     write(os.path.join(DOCS, '404.html'), shell(
