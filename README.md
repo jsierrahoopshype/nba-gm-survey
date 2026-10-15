@@ -46,15 +46,34 @@ git push -u origin main
 4. On GitHub: Settings > Pages > Deploy from a branch > `main` / `/docs` > Save.
 5. Site appears at `https://jsierrahoopshype.github.io/nba-gm-survey/` in a minute or two.
 
-## Updating when a new survey drops (e.g. 2026-27)
+## Updating when a new survey drops (e.g. 2027-28)
 
-1. Append the new rows to `data/gm_survey.csv` (same columns as today).
-2. Run `build.bat` (or the two python commands it contains).
-3. If the build warns about brand-new player names, run
+1. Append the new rows to `data/gm_survey.csv` (same columns as today) and commit
+   to `main` (the github.com web editor is fine).
+2. The **Rebuild site** Action (`.github/workflows/rebuild.yml`) runs on its own:
+   it rebuilds the data, redraws only the share images whose content changed,
+   regenerates every page and the sitemap, and commits the result.
+   You can also start it by hand: Actions tab > Rebuild site > Run workflow.
+3. If brand-new player names should get headshots, run
    `pip install nba_api` once, then `python scripts/update_player_ids.py`,
-   then `build.bat` again. Genuinely non-NBA names (Euro players) staying
-   unmatched is normal; they get initials avatars.
-4. Commit and push. Done — every page, chart and highlight regenerates.
+   and commit `data/player_ids.csv` (the Action rebuilds again).
+   Names nba_api doesn't know yet (new rookies, overseas players) simply
+   show without a photo.
+
+`build.bat` still works for a local rebuild of data and pages; it skips the
+share images (pages then keep whatever images already exist).
+
+## Share images and titles
+
+- `scripts/generate_og_images.py` draws one 1200x630 JPEG per page into
+  `docs/og/` (player faces from the nba-headshots repo, team logos from
+  `scripts/og_assets/logos/`, fonts in `scripts/og_assets/fonts/`, OFL licensed).
+  `docs/og/hashes.json` records what each card showed, so only changed cards
+  are redrawn. Bump `DESIGN_VERSION` in the script to redraw all of them.
+- `scripts/generate_entity_pages.py` writes each page's title, description,
+  canonical and og:/twitter: tags; it adds og:image only when the image exists.
+- `scripts/qlabels.py` holds the short question names used on cards and in
+  descriptions ("Franchise player", "MVP pick").
 
 ## Notes
 

@@ -1,0 +1,70 @@
+# Rebuilds the whole site (data JSON, share images, HTML pages, sitemap) and
+# commits the result. Runs when the survey data or the build scripts change on
+# main, or by hand from the Actions tab ("Run workflow").
+name: Rebuild site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/gm_survey.csv'
+      - 'data/aliases.json'
+      - 'data/player_ids.csv'
+      - 'data/question_overrides.json'
+      - 'scripts/**'
+  workflow_dispatch:
+    inputs:
+      force_images:
+        description: 'Redraw every share image (only needed after a design change)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebuild-site
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      # Player faces come from the nba-headshots repo (face2 folder only).
+      - name: Fetch headshots
+        run: |
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            https://github.com/jsierrahoopshype/nba-headshots "$RUNNER_TEMP/nba-headshots"
+          git -C "$RUNNER_TEMP/nba-headshots" sparse-checkout set players/headshots/face2
+
+      - name: Build data
+        run: python scripts/build_site_data.py
+
+      - name: Build share images
+        run: |
+          python scripts/generate_og_images.py --faces "$RUNNER_TEMP/nba-headshots" \
+            ${{ inputs.force_images && '--force' || '' }}
+
+      - name: Build pages
+        run: python scripts/generate_entity_pages.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A docs data
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -m "Rebuild site"
+            git push
+          fi

@@ -130,7 +130,9 @@
       'Show all ' + answers.length + ' answers</button></div>';
   }
 
-  function setTitleBits(t) { if (t) document.title = t + ' | NBA GM Survey Tracker'; }
+  // Every page ships its SEO title baked into the HTML by generate_entity_pages.py.
+  // Don't overwrite it here: Google renders this script and would index the shorter one.
+  function setTitleBits(t) { /* intentionally a no-op */ }
 
   // ---------------------------------------------------------------- charts
   var SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
