@@ -72,6 +72,10 @@ share images (pages then keep whatever images already exist).
   are redrawn. Bump `DESIGN_VERSION` in the script to redraw all of them.
 - `scripts/generate_entity_pages.py` writes each page's title, description,
   canonical and og:/twitter: tags; it adds og:image only when the image exists.
+- The sitemap gives every page a `<lastmod>` date that moves only when that
+  page's content changes (fingerprints in `data/sitemap_lastmod.json`).
+- Card design follows the HoopsMatic Trade Card (Poppins, indigo background,
+  purple-to-pink accents).
 - `scripts/qlabels.py` holds the short question names used on cards and in
   descriptions ("Franchise player", "MVP pick").
 
