@@ -6,12 +6,22 @@
   var $app = document.getElementById('app');
   var cache = {};
 
+  // Player faces: nba-headshots' face-fill portraits (face fills the circle).
+  // FACE maps nba id -> file stem (data/face_fill.json). Every data load waits
+  // for it, so avatars render with it already in hand.
+  var FACE_BASE = 'https://jsierrahoopshype.github.io/nba-headshots/players/headshots/';
+  var FACE = {};
+  var facesReady = fetch(R + 'data/face_fill.json')
+    .then(function (r) { return r.ok ? r.json() : {}; })
+    .catch(function () { return {}; })
+    .then(function (m) { FACE = m || {}; });
+
   function fetchJSON(path) {
     if (cache[path]) return cache[path];
-    cache[path] = fetch(R + 'data/' + path).then(function (r) {
+    cache[path] = Promise.all([fetch(R + 'data/' + path).then(function (r) {
       if (!r.ok) throw new Error(path + ' -> ' + r.status);
       return r.json();
-    });
+    }), facesReady]).then(function (x) { return x[0]; });
     return cache[path];
   }
 
@@ -47,17 +57,23 @@
     return slugmapPromise;
   }
 
-  function headshotURL(nbaId) {
-    return 'https://cdn.nba.com/headshots/nba/latest/260x190/' + nbaId + '.png';
-  }
   function logoURL(teamId) {
     return 'https://cdn.nba.com/logos/nba/' + teamId + '/global/L/logo.svg';
   }
-  // avatar for an entity key. No image available -> render nothing at all.
+  // avatar for an entity key. A player with an nba id gets his face-fill photo,
+  // or his initials when there is no file (or it fails to load). Anything else
+  // with no image available -> render nothing at all.
   function avatarHTML(kind, name, opts) {
     opts = opts || {};
     var src = null;
-    if (kind === 'player' && opts.nbaId) src = headshotURL(opts.nbaId);
+    if (kind === 'player' && opts.nbaId) {
+      var stem = FACE[opts.nbaId], ini = esc(initials(name || ''));
+      var fcls = 'avatar face' + (opts.lg ? ' lg' : '');
+      if (!stem) return '<span class="' + fcls + '" data-ini="' + ini + '">' + ini + '</span>';
+      return '<span class="' + fcls + '" data-ini="' + ini + '"><img loading="lazy" src="' + FACE_BASE +
+        (opts.lg ? 'face-fill-320/' : 'face-fill/') + stem + '.webp" alt="" ' +
+        'onerror="this.parentNode.textContent=this.parentNode.dataset.ini"></span>';
+    }
     else if (kind === 'team' && opts.teamId) src = logoURL(opts.teamId);
     if (!src) return '';
     var cls = 'avatar' + (opts.lg ? ' lg' : '') + (kind === 'team' ? ' team' : '');

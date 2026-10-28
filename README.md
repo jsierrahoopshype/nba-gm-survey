@@ -81,11 +81,14 @@ share images (pages then keep whatever images already exist).
 
 ## Notes
 
-- Headshots come straight off `cdn.nba.com/headshots/nba/latest/260x190/{id}.png`,
-  team logos off `cdn.nba.com/logos/nba/{teamId}/global/L/logo.svg`, loaded
-  client-side by the visitor's browser (no proxy needed; these are public CDN
-  images, not the blocked stats API). To switch to the nba-headshots pipeline,
-  change `headshotURL()` at the top of `docs/assets/app.js`.
+- Player headshots are nba-headshots' face-fill portraits (the one HoopsMatic
+  headshot look: the face fills a grey circle), loaded from
+  `jsierrahoopshype.github.io/nba-headshots/`. `build_site_data.py` writes
+  `docs/data/face_fill.json` (nba id -> file) from nba-headshots' face-fill list
+  (committed copy in `data/face_fill_stems.txt`); a player with no file shows
+  his initials. Team logos come off `cdn.nba.com/logos/nba/{teamId}/global/L/logo.svg`,
+  loaded client-side by the visitor's browser. Share images (`docs/og/`) still
+  use the face2 crops.
 - `≈` before a percentage marks NBA.com's "others receiving votes" shares that
   were inferred as one-vote fractions in the source CSV.
 - Franchise history is unified: Seattle -> OKC, New Jersey -> Brooklyn,

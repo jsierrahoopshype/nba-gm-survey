@@ -121,6 +121,29 @@ def question_type(q, answers, overrides):
         return 'team'
     return 'player'
 
+# ---------------------------------------------------------------- headshots
+
+# Player faces on the site: nba-headshots' face-fill portraits (the one HoopsMatic
+# headshot look). docs/data/face_fill.json maps nba id -> file stem for app.js;
+# a player with no face-fill file shows his initials.
+FACE_HASHES_URL = ('https://raw.githubusercontent.com/jsierrahoopshype/nba-headshots/main/'
+                   'players/headshots/face-fill/.hashes.json')
+FACE_STEMS = os.path.join(DATA, 'face_fill_stems.txt')
+
+def load_face_stems():
+    """nba id -> face-fill stem. Refreshes data/face_fill_stems.txt from nba-headshots
+    when it can be reached; otherwise uses the committed copy."""
+    try:
+        import urllib.request
+        with urllib.request.urlopen(FACE_HASHES_URL, timeout=30) as r:
+            stems = sorted(json.load(r)['files'])
+        with open(FACE_STEMS, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(stems) + '\n')
+    except Exception:
+        with open(FACE_STEMS, encoding='utf-8') as f:
+            stems = [l.strip() for l in f if l.strip()]
+    return {int(s.split('-', 1)[0]): s for s in stems if s.split('-', 1)[0].isdigit()}
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -532,9 +555,16 @@ def main():
               open(os.path.join(OUT, 'slugmap.json'), 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))
 
+    # nba id -> face-fill stem, for the players on the site
+    stems = load_face_stems()
+    ids = sorted({x['nbaId'] for x in ent_extra.values() if x.get('nbaId')})
+    json.dump({str(i): stems[i] for i in ids if i in stems},
+              open(os.path.join(OUT, 'face_fill.json'), 'w', encoding='utf-8'),
+              ensure_ascii=False, separators=(',', ':'))
+
     print(f'rows {len(rows)} | questions {len(qans)} | players {len(entities["players"])} '
           f'| coaches {len(entities["coaches"])} | teams {len(entities["teams"])}')
-    print('wrote docs/data/: entities.json, highlights.json, slugmap.json, '
+    print('wrote docs/data/: entities.json, highlights.json, slugmap.json, face_fill.json, '
           f'q/*.json ({len(q_index)}), s/*.json ({len(season_qs)}), e/*.json ({len(ent_rows)})')
 
 if __name__ == '__main__':
