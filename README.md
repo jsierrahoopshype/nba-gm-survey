@@ -4,7 +4,7 @@ Every answer to every question in the NBA.com annual GM Survey (2002-03 to 2026-
 browsable by season, question, player, team and coach. Static site, no framework,
 served from `/docs` via GitHub Pages.
 
-Live (once deployed): https://jsierrahoopshype.github.io/nba-gm-survey/
+Live on HoopsMatic: https://hoopsmatic.com/nba-gm-survey/
 
 ## Repo layout
 
