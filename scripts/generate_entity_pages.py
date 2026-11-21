@@ -62,7 +62,10 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on='', og_key=None):
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{root}assets/style.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%233b82f6'/%3E%3Cpath d='M4 50h92M50 4v92M15 18a46 46 0 0 1 0 64M85 18a46 46 0 0 0 0 64' stroke='%23fff' stroke-width='5' fill='none'/%3E%3C/svg%3E">
+<link rel="icon" href="https://hoopsmatic.com/favicon.ico" sizes="48x48">
+<link rel="icon" href="https://hoopsmatic.com/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://hoopsmatic.com/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="https://hoopsmatic.com/apple-touch-icon.png">
 </head>
 <body>
 <div class="wrap">
@@ -92,7 +95,8 @@ def sitemap_lastmod(urls, data_for, data):
     """Per-URL <lastmod> that moves only when that page's content changes.
 
     A page's fingerprint = its HTML (minus the masthead strap, whose year count
-    changes for every page each season) + the data JSON it renders. Fingerprints
+    changes for every page each season, and minus the favicon links) + the data
+    JSON it renders. Fingerprints
     and dates live in data/sitemap_lastmod.json (committed); a URL keeps its old
     date while its fingerprint is unchanged, and gets today's date (UTC) when it
     changes or is new. URLs no longer in the site drop out."""
@@ -106,7 +110,11 @@ def sitemap_lastmod(urls, data_for, data):
         rel = u[len(BASE) + 1:] or 'index.html'
         h = hashlib.sha1()
         page = open(os.path.join(DOCS, rel), encoding='utf-8').read()
-        h.update(re.sub(r'<p class="strap">.*?</p>', '', page).encode('utf-8'))
+        page = re.sub(r'<p class="strap">.*?</p>', '', page)
+        # Favicon links are site chrome, not page content: leave them out so a
+        # site-wide icon swap doesn't move every page's <lastmod>.
+        page = re.sub(r'<link rel="(?:icon|apple-touch-icon)"[^>]*>\n?', '', page)
+        h.update(page.encode('utf-8'))
         df = data_for.get(u)
         if df and os.path.exists(os.path.join(data, df)):
             h.update(open(os.path.join(data, df), 'rb').read())
