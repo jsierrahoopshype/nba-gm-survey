@@ -42,6 +42,11 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on='', og_key=None):
         f'<a href="{root}{href}"{on_attr if on == nav_on else ""}>{label}</a>'
         for href, label, on in navs)
     page = json.dumps({'kind': kind, 'key': key, 'root': root})
+    # The hub (and 404, which renders the hub) has no title of its own, so the
+    # site name stays its H1. Every other page renders its own H1 in app.js, so
+    # there the site name is a plain div styled exactly like the old H1.
+    site_tag = 'h1' if kind == 'home' else 'div class="site-name"'
+    site_name = f'<{site_tag}><a href="{root}index.html">{SITE}</a></{site_tag.split()[0]}>'
     return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,7 +77,7 @@ def shell(*, title, desc, canonical, kind, key, root, nav_on='', og_key=None):
 <div class="topbar"><input id="q" type="search" placeholder="Search players, teams, coaches, questions…" autocomplete="off">
 <div class="search-results" id="qresults"></div></div>
 <div class="masthead">
-<h1><a href="{root}index.html">{SITE}</a></h1>
+{site_name}
 <p class="strap">{N_YEARS} years of the NBA.com GM Survey, <b>cross-referenced</b> by player, team, coach, question and season.</p>
 </div>
 <nav class="tabs">{nav}</nav>
@@ -114,6 +119,10 @@ def sitemap_lastmod(urls, data_for, data):
         # Favicon links are site chrome, not page content: leave them out so a
         # site-wide icon swap doesn't move every page's <lastmod>.
         page = re.sub(r'<link rel="(?:icon|apple-touch-icon)"[^>]*>\n?', '', page)
+        # The masthead site name moved from <h1> to <div class="site-name"> on
+        # subpages (one H1 per page, same look). Hash it as the old <h1> so that
+        # markup-only change doesn't move every page's <lastmod>.
+        page = re.sub(r'<div class="site-name">(<a [^>]*>.*?</a>)</div>', r'<h1>\1</h1>', page)
         h.update(page.encode('utf-8'))
         df = data_for.get(u)
         if df and os.path.exists(os.path.join(data, df)):

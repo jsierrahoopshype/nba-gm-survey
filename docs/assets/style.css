@@ -48,8 +48,8 @@ img { max-width: 100%; }
 .search-results .kind { margin-left: auto; font-family: var(--mono); font-size: .62rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0; }
 
 /* ---------- masthead + tabs ---------- */
-.masthead h1 { font-size: 1.45rem; font-weight: 700; margin: 0 0 2px; letter-spacing: -.01em; }
-.masthead h1 a:hover { color: var(--text); }
+.masthead h1, .masthead .site-name { font-size: 1.45rem; font-weight: 700; margin: 0 0 2px; letter-spacing: -.01em; }
+.masthead h1 a:hover, .masthead .site-name a:hover { color: var(--text); }
 .masthead .strap { color: var(--text-secondary); font-size: .9rem; margin: 0 0 12px; }
 .masthead .strap b { color: var(--accent); font-weight: 500; }
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -273,7 +273,7 @@ h1.page-title { font-size: clamp(22px, 3.6vw, 30px); font-weight: 700; letter-sp
 
 /* ---------- type scale bump (site-wide bigger fonts) ---------- */
 body { font-size: 16px; }
-.masthead h1 { font-size: 1.7rem; }
+.masthead h1, .masthead .site-name { font-size: 1.7rem; }
 .masthead .strap { font-size: 1rem; }
 .tabs a { font-size: .8rem; }
 h1.page-title { font-size: clamp(26px, 4vw, 34px); }
@@ -368,7 +368,7 @@ body { font-size: 17px; }
 .kicker { font-size: .72rem; }
 .tile .v { font-size: 1.9rem; }
 .tile .l { font-size: .72rem; }
-.masthead h1 { font-size: 1.9rem; }
+.masthead h1, .masthead .site-name { font-size: 1.9rem; }
 .masthead .strap { font-size: 1.05rem; }
 .tabs a { font-size: .85rem; }
 .win-card .q { font-size: .85rem; }
@@ -423,7 +423,7 @@ body { font-size: 17px; }
 
 /* ---------- round 7: one more global size bump ---------- */
 body { font-size: 18px; }
-.masthead h1 { font-size: 2.1rem; }
+.masthead h1, .masthead .site-name { font-size: 2.1rem; }
 .masthead .strap { font-size: 1.1rem; }
 .tabs a { font-size: .9rem; }
 .mtab td { font-size: 1.05rem; }
