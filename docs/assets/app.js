@@ -36,11 +36,6 @@
     d.innerHTML = html.trim();
     return d.firstChild;
   }
-  function initials(name) {
-    var p = name.replace(/[^A-Za-zÀ-ɏ ]/g, '').split(/\s+/).filter(Boolean);
-    if (!p.length) return '?';
-    return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
-  }
   function fmtPct(pct, ps) {
     if (pct == null) return '<span class="est">—</span>';
     var v = (Math.round(pct * 10) / 10) + '%';
@@ -60,19 +55,19 @@
   function logoURL(teamId) {
     return 'https://cdn.nba.com/logos/nba/' + teamId + '/global/L/logo.svg';
   }
-  // avatar for an entity key. A player with an nba id gets his face-fill photo,
-  // or his initials when there is no file (or it fails to load). Anything else
-  // with no image available -> render nothing at all.
+  // avatar for an entity key. A player with an nba id gets his face-fill photo;
+  // no file (or one that fails to load) -> nothing at all, never initials.
+  // Anything else with no image available -> render nothing at all.
   function avatarHTML(kind, name, opts) {
     opts = opts || {};
     var src = null;
     if (kind === 'player' && opts.nbaId) {
-      var stem = FACE[opts.nbaId], ini = esc(initials(name || ''));
+      var stem = FACE[opts.nbaId];
       var fcls = 'avatar face' + (opts.lg ? ' lg' : '');
-      if (!stem) return '<span class="' + fcls + '" data-ini="' + ini + '">' + ini + '</span>';
-      return '<span class="' + fcls + '" data-ini="' + ini + '"><img loading="lazy" src="' + FACE_BASE +
+      if (!stem) return '';
+      return '<span class="' + fcls + '"><img loading="lazy" src="' + FACE_BASE +
         (opts.lg ? 'face-fill-320/' : 'face-fill/') + stem + '.webp" alt="" ' +
-        'onerror="this.parentNode.textContent=this.parentNode.dataset.ini"></span>';
+        'onerror="this.parentNode.remove()"></span>';
     }
     else if (kind === 'team' && opts.teamId) src = logoURL(opts.teamId);
     if (!src) return '';

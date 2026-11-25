@@ -125,7 +125,7 @@ def question_type(q, answers, overrides):
 
 # Player faces on the site: nba-headshots' face-fill portraits (the one HoopsMatic
 # headshot look). docs/data/face_fill.json maps nba id -> file stem for app.js;
-# a player with no face-fill file shows his initials.
+# a player with no face-fill file shows no picture (never initials).
 FACE_HASHES_URL = ('https://raw.githubusercontent.com/jsierrahoopshype/nba-headshots/main/'
                    'players/headshots/face-fill/.hashes.json')
 FACE_STEMS = os.path.join(DATA, 'face_fill_stems.txt')
